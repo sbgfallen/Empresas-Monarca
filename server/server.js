@@ -105,3 +105,12 @@ initializeDatabase()
     console.error("[Server] Failed to initialize database:", err.message);
     process.exit(1);
   });
+
+app.get("/db-test", async (req, res) => {
+  try {
+    const result = await db.query("SELECT * FROM admin_users");
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
