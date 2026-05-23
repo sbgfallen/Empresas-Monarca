@@ -11,12 +11,16 @@ const { ensureAnalyticsTables } = require("./services/analytics");
 const { ensureCreditsTable } = require("./services/credits");
 const { ensureCategoriesTable } = require("./services/categories");
 const { ensureSubscriptionsTable } = require("./services/subscriptions");
+const { ensureProductsTable } = require("./services/products");
 
 async function initializeDatabase() {
   console.log("[Init] Initializing database tables...");
   const start = Date.now();
 
   try {
+    // Products table must be created BEFORE promotions (foreign key dependency)
+    await ensureProductsTable();
+
     await Promise.all([
       ensureBannersTable(),
       ensureAnnouncementsTable(),
