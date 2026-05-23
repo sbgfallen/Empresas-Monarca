@@ -19,7 +19,9 @@ function getBootstrapAdmin() {
     process.env.NODE_ENV === "production" &&
     (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD)
   ) {
-    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD are required in production.");
+    console.warn(
+      "[Admin] Using default admin credentials. Set ADMIN_EMAIL and ADMIN_PASSWORD env vars for security."
+    );
   }
 
   return {
