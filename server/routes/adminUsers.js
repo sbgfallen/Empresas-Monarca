@@ -1,140 +1,264 @@
+const express = require("express");
 const bcrypt = require("bcryptjs");
 
 const db = require("../config/db");
+const { requireAdmin, requireRoles } = require("../middleware/auth");
+const { ensureAdminUsers } = require("../services/adminUsers");
 
-const DEFAULT_ADMIN = {
-  email: "marcox090919@gmail.com",
-  name: "marco",
-  password: "020222Mm.",
-  role: "owner",
-};
+const router = express.Router();
+const MANAGER_ROLES = ["owner", "super_admin"];
+const VALID_ROLES = new Set(["admin", "super_admin", "owner"]);
 
-let setupPromise;
+router.use(requireAdmin, requireRoles(MANAGER_ROLES));
 
-function getBootstrapAdmin() {
-  const email = process.env.ADMIN_EMAIL || DEFAULT_ADMIN.email;
-  const password = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN.password;
+function cleanEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function cleanRole(role) {
+  const normalized = String(role || "admin").trim();
+
+  return VALID_ROLES.has(normalized) ? normalized : "admin";
+}
+
+async function countActiveManagers() {
+  const result = await db.query(
+    `
+    SELECT COUNT(*)::int AS total
+    FROM admin_users
+    WHERE role IN ('owner', 'super_admin') AND active = TRUE
+    `
+  );
+
+  return result.rows[0].total;
+}
+
+async function wouldRemoveLastManager(id, nextRole, nextActive) {
+  const current = await db.query(
+    `
+    SELECT role, active
+    FROM admin_users
+    WHERE id = $1
+    LIMIT 1
+    `,
+    [id]
+  );
+
+  const admin = current.rows[0];
 
   if (
-    process.env.NODE_ENV === "production" &&
-    (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD)
+    !admin ||
+    !["owner", "super_admin"].includes(admin.role) ||
+    !admin.active
   ) {
-    console.warn(
-      "[Admin] Using default admin credentials. Set ADMIN_EMAIL and ADMIN_PASSWORD env vars for security."
+    return false;
+  }
+
+  const remainsManager = MANAGER_ROLES.includes(nextRole) && nextActive;
+
+  if (remainsManager) {
+    return false;
+  }
+
+  return (await countActiveManagers()) <= 1;
+}
+
+router.get("/", async (req, res) => {
+  try {
+    await ensureAdminUsers();
+
+    const result = await db.query(
+      `
+      SELECT id, name, email, role, active, created_at, updated_at
+      FROM admin_users
+      ORDER BY id ASC
+      `
     );
+
+    res.json({
+      admins: result.rows,
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).json({
+      error: "Admin users list error",
+    });
   }
+});
 
-  return {
-    email: email.trim().toLowerCase(),
-    name: process.env.ADMIN_NAME || DEFAULT_ADMIN.name,
-    password,
-    role: process.env.ADMIN_ROLE || DEFAULT_ADMIN.role,
-  };
-}
+router.post("/", async (req, res) => {
+  try {
+    const name = String(req.body.name || "").trim();
+    const email = cleanEmail(req.body.email);
+    const password = String(req.body.password || "");
+    const role = cleanRole(req.body.role);
 
-async function ensureAdminUsers() {
-  if (!setupPromise) {
-    setupPromise = (async () => {
-      await db.query(`
-        CREATE TABLE IF NOT EXISTS admin_users (
-          id SERIAL PRIMARY KEY,
-          name TEXT NOT NULL,
-          email TEXT UNIQUE NOT NULL,
-          password_hash TEXT NOT NULL,
-          role TEXT NOT NULL DEFAULT 'admin',
-          active BOOLEAN NOT NULL DEFAULT TRUE,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `);
+    // Only owner can create owner accounts
+    if (role === "owner" && req.admin.role !== "owner") {
+      return res.status(403).json({
+        error: "Only the owner can create owner accounts",
+      });
+    }
 
-      const admins = await db.query("SELECT COUNT(*)::int AS total FROM admin_users");
+    if (!name || !email || password.length < 8) {
+      return res.status(400).json({
+        error: "Name, email and an 8 character password are required",
+      });
+    }
 
-      if (admins.rows[0].total === 0) {
-        const bootstrap = getBootstrapAdmin();
-        const passwordHash = await bcrypt.hash(bootstrap.password, 12);
+    const passwordHash = await bcrypt.hash(password, 12);
+    const created = await db.query(
+      `
+      INSERT INTO admin_users (name, email, password_hash, role)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, name, email, role, active, created_at, updated_at
+      `,
+      [name, email, passwordHash, role]
+    );
 
-        await db.query(
-          `
-          INSERT INTO admin_users (name, email, password_hash, role)
-          VALUES ($1, $2, $3, $4)
-          `,
-          [bootstrap.name, bootstrap.email, passwordHash, bootstrap.role]
-        );
+    res.status(201).json({
+      admin: created.rows[0],
+    });
+  } catch (error) {
+    if (error.code === "23505") {
+      return res.status(409).json({
+        error: "Email already exists",
+      });
+    }
 
-        if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
-          console.warn(
-            "Created development admin: admin@empresasmonarca.com / MonarcaAdmin2026!. Set ADMIN_EMAIL and ADMIN_PASSWORD before production."
-          );
-        }
-      }
-    })();
+    console.log(error);
+
+    res.status(500).json({
+      error: "Admin user create error",
+    });
   }
+});
 
-  return setupPromise;
-}
+router.put("/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const name = String(req.body.name || "").trim();
+    const email = cleanEmail(req.body.email);
+    const role = cleanRole(req.body.role);
+    const active = Boolean(req.body.active);
 
-async function findAdminByEmail(email) {
-  await ensureAdminUsers();
+    // Only owner can assign owner role
+    if (role === "owner" && req.admin.role !== "owner") {
+      return res.status(403).json({
+        error: "Only the owner can assign the owner role",
+      });
+    }
 
-  const result = await db.query(
-    `
-    SELECT id, name, email, password_hash, role, active
-    FROM admin_users
-    WHERE email = $1
-    LIMIT 1
-    `,
-    [email.trim().toLowerCase()]
-  );
+    // If the current user is being updated to owner, only owner can do that
+    const currentUser = await db.query(
+      "SELECT role FROM admin_users WHERE id = $1 LIMIT 1",
+      [id]
+    );
 
-  return result.rows[0] || null;
-}
+    if (
+      currentUser.rows[0]?.role === "owner" &&
+      req.admin.role !== "owner"
+    ) {
+      return res.status(403).json({
+        error: "Only the owner can modify another owner",
+      });
+    }
 
-async function findAdminById(id) {
-  await ensureAdminUsers();
+    if (!name || !email || !id) {
+      return res.status(400).json({
+        error: "Name and email are required",
+      });
+    }
 
-  const result = await db.query(
-    `
-    SELECT id, name, email, role, active
-    FROM admin_users
-    WHERE id = $1
-    LIMIT 1
-    `,
-    [id]
-  );
+    if (Number(req.admin.id) === id && !active) {
+      return res.status(400).json({
+        error: "You cannot deactivate your own user",
+      });
+    }
 
-  return result.rows[0] || null;
-}
+    if (await wouldRemoveLastManager(id, role, active)) {
+      return res.status(400).json({
+        error: "At least one active owner or super_admin is required",
+      });
+    }
 
-async function findAdminCredentialsById(id) {
-  await ensureAdminUsers();
+    const updated = await db.query(
+      `
+      UPDATE admin_users
+      SET name = $1,
+          email = $2,
+          role = $3,
+          active = $4,
+          updated_at = NOW()
+      WHERE id = $5
+      RETURNING id, name, email, role, active, created_at, updated_at
+      `,
+      [name, email, role, active, id]
+    );
 
-  const result = await db.query(
-    `
-    SELECT id, name, email, password_hash, role, active
-    FROM admin_users
-    WHERE id = $1
-    LIMIT 1
-    `,
-    [id]
-  );
+    if (!updated.rows[0]) {
+      return res.status(404).json({
+        error: "Admin user not found",
+      });
+    }
 
-  return result.rows[0] || null;
-}
+    res.json({
+      admin: updated.rows[0],
+    });
+  } catch (error) {
+    if (error.code === "23505") {
+      return res.status(409).json({
+        error: "Email already exists",
+      });
+    }
 
-function toAdminDto(admin) {
-  return {
-    id: admin.id,
-    email: admin.email,
-    name: admin.name,
-    role: admin.role,
-  };
-}
+    console.log(error);
 
-module.exports = {
-  ensureAdminUsers,
-  findAdminByEmail,
-  findAdminCredentialsById,
-  findAdminById,
-  toAdminDto,
-};
+    res.status(500).json({
+      error: "Admin user update error",
+    });
+  }
+});
+
+router.patch("/:id/password", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const password = String(req.body.password || "");
+
+    if (!id || password.length < 8) {
+      return res.status(400).json({
+        error: "An 8 character password is required",
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const updated = await db.query(
+      `
+      UPDATE admin_users
+      SET password_hash = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING id
+      `,
+      [passwordHash, id]
+    );
+
+    if (!updated.rows[0]) {
+      return res.status(404).json({
+        error: "Admin user not found",
+      });
+    }
+
+    res.json({
+      success: true,
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).json({
+      error: "Admin password update error",
+    });
+  }
+});
+
+module.exports = router;
