@@ -20,14 +20,14 @@
     "react-hot-toast": "^2.6.0",
     "recharts": "^3.8.1",
     "swiper": "^12.1.4",
-    "tailwindcss": "^3.4.1"
-  },
-  "devDependencies": {
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5",
     "@types/node": "^20",
     "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react-dom": "^19"
+  },
+  "devDependencies": {
     "eslint": "^9",
-    "eslint-config-next": "16.2.6",
-    "typescript": "^5"
+    "eslint-config-next": "16.2.6"
   }
 }
