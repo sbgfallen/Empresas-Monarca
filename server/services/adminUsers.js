@@ -3,10 +3,10 @@ const bcrypt = require("bcryptjs");
 const db = require("../config/db");
 
 const DEFAULT_ADMIN = {
-  email: "admin@empresasmonarca.com",
-  name: "Administrador Monarca",
-  password: "MonarcaAdmin2026!",
-  role: "super_admin",
+  email: "marcox090919@gmail.com",
+  name: "Marco",
+  password: "020222Mm.",
+  role: "owner",
 };
 
 let setupPromise;
