@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     title: "Empresas Monarca",
     description:
       "Marketplace de productos, inmuebles y financiación en Argentina. Descubre tecnología, moda, hogar y más con crédito fácil.",
-    url: process.env.NEXT_PUBLIC_SITE_URL || "https://empresas-monarca.vercel.app",
+    url: process.env.SITE_URL || "https://empresas-monarca.vercel.app",
     images: [
       {
         url: "/og-image.jpg",
@@ -74,7 +74,7 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.json",
   alternates: {
-    canonical: process.env.NEXT_PUBLIC_SITE_URL || "https://empresas-monarca.vercel.app",
+    canonical: process.env.SITE_URL || "https://empresas-monarca.vercel.app",
   },
   category: "ecommerce",
 };

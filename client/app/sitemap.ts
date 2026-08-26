@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://empresas-monarca.vercel.app";
+  process.env.SITE_URL || "https://empresas-monarca.vercel.app";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
