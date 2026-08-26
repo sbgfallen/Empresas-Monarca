@@ -1,0 +1,310 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(244, 63, 94, 0.10), transparent 34%),
+    linear-gradient(135deg, #000000 0%, #0a0a0a 46%, #000000 100%);
+  color: #fefcf5;
+  overflow-x: hidden;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+img {
+  max-width: 100%;
+}
+
+::selection {
+  background: rgba(244, 63, 94, 0.35);
+  color: #ffffff;
+}
+
+/* ── Custom Scrollbar ── */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #fb7185, #e11d48);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #f43f5e, #be123c);
+}
+
+/* ── Smooth fade-in for sections ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.section-enter {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+/* ── Gradient shimmer animation ── */
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.gradient-shimmer {
+  background-size: 200% auto;
+  animation: shimmer 4s ease-in-out infinite;
+}
+
+/* ── Floating glow pulse ── */
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.glow-pulse {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* ── Float animation for decorative elements ── */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.float-animate {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* ── Slow spin for decorative rings ── */
+@keyframes slowSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin-slow {
+  animation: slowSpin 20s linear infinite;
+}
+
+/* ── Number count transition ── */
+@keyframes countPop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.count-pop {
+  animation: countPop 0.3s ease-out;
+}
+
+/* ── Typing cursor for hero ── */
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.cursor-blink::after {
+  content: "|";
+  animation: blink 1s step-end infinite;
+  color: #f59e0b;
+}
+
+/* ── Glass card base ── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(245, 158, 11, 0.12);
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+/* ── Range input styling ── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fb7185, #e11d48);
+  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.3);
+  transition: box-shadow 0.2s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.5);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fb7185, #e11d48);
+  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+/* ── Fluid section transitions ── */
+section {
+  transition: background 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Smooth gradient transitions between sections */
+.bg-gradient-flow {
+  background-size: 400% 400% !important;
+  animation: gradientFlow 15s ease infinite;
+}
+
+@keyframes gradientFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Elegant reveal animation for cards */
+@keyframes cardReveal {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.97);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.card-reveal {
+  animation: cardReveal 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+}
+
+/* Smooth hover scale utility */
+.hover-lift {
+  transition: transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px -10px rgba(0, 0, 0, 0.4);
+}
+
+/* Premium border gradient animation */
+@keyframes borderGlow {
+  0%, 100% {
+    border-color: rgba(244, 63, 94, 0.1);
+  }
+  50% {
+    border-color: rgba(244, 63, 94, 0.25);
+  }
+}
+
+.border-glow {
+  animation: borderGlow 4s ease-in-out infinite;
+}
+
+/* Smooth image loading blur effect */
+img {
+  transition: filter 0.6s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+img.loading {
+  filter: blur(8px);
+  opacity: 0.5;
+}
+
+img.loaded {
+  filter: blur(0);
+  opacity: 1;
+}
+
+/* ── Recharts tooltip - force dark theme ── */
+.recharts-tooltip-wrapper {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.recharts-tooltip-wrapper:focus,
+.recharts-tooltip-wrapper:focus-visible,
+.recharts-tooltip-wrapper:active {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.recharts-default-tooltip {
+  background: transparent !important;
+  border: none !important;
+}

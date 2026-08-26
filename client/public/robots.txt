@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sabri-premium.vercel.app/sitemap.xml
+# Host
+Host: https://sabri-premium.vercel.app
