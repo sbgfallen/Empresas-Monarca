@@ -1,14 +1,12 @@
 /**
  * Vercel Serverless Adapter for Express
- * Wraps the Express app as a Vercel serverless function.
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import express from "express";
-import cors from "cors";
-import helmet from "helmet";
-import cookieParser from "cookie-parser";
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const cookieParser = require("cookie-parser");
 
-// ─── Import routes (from local server copy) ───────────
+// ─── Import routes ─────────────────────────────────────
 const authRoutes = require("../server/routes/auth");
 const adminUserRoutes = require("../server/routes/adminUsers");
 const productRoutes = require("../server/routes/products");
@@ -83,13 +81,13 @@ async function ensureDb() {
     await initializeDatabase();
     dbInitialized = true;
     console.log("[Vercel] Database initialized successfully");
-  } catch (err: any) {
+  } catch (err) {
     console.error("[Vercel] Database init error:", err.message);
   }
 }
 
 // ─── Export for Vercel ─────────────────────────────────
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+module.exports = async (req, res) => {
   await ensureDb();
   return app(req, res);
-}
+};
