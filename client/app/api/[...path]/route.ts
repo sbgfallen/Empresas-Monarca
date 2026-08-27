@@ -22,14 +22,12 @@ async function handleRequest(
   const apiPath = "/api/" + path.join("/");
   const url = new URL(request.url);
 
-  // Collect body bytes
   let body: Buffer | undefined;
   if (request.body) {
     const ab = await request.arrayBuffer();
     body = Buffer.from(ab);
   }
 
-  // Parse cookies
   const cookieHeader = request.headers.get("cookie") || "";
   const cookies: Record<string, string> = {};
   cookieHeader.split(";").forEach((c) => {
@@ -39,13 +37,11 @@ async function handleRequest(
     }
   });
 
-  // Build headers
   const headers: Record<string, string> = {};
   request.headers.forEach((value, key) => {
     headers[key] = value;
   });
 
-  // Build Node.js IncomingMessage-like object
   const readable = new Readable({
     read() {
       if (body) this.push(body);
@@ -66,11 +62,29 @@ async function handleRequest(
     get connection() { return this.socket; },
   });
 
-  // Build response collector — wraps in Promise that resolves on end()
   return new Promise<NextResponse>((resolve) => {
     const chunks: Buffer[] = [];
     let _statusCode = 200;
     const _headers: Record<string, string> = {};
+    let resolved = false;
+
+    function finalize() {
+      if (resolved) return;
+      resolved = true;
+      const bodyOut = Buffer.concat(chunks);
+      const responseHeaders: Record<string, string> = {};
+      for (const [k, v] of Object.entries(_headers)) {
+        if (k !== "transfer-encoding" && k !== "content-length") {
+          responseHeaders[k] = v;
+        }
+      }
+      responseHeaders["content-length"] = String(bodyOut.length);
+      if (!responseHeaders["content-type"]) {
+        responseHeaders["content-type"] = "application/octet-stream";
+      }
+      console.log(`[API Bridge] ${apiPath} → ${_statusCode} (${bodyOut.length} bytes)`);
+      resolve(new NextResponse(bodyOut, { status: _statusCode, headers: responseHeaders }));
+    }
 
     const nodeRes: any = {
       statusCode: 200,
@@ -93,48 +107,36 @@ async function handleRequest(
         return this;
       },
       write(chunk: string | Buffer) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        chunks.push(buf);
         return true;
       },
       end(chunk?: string | Buffer) {
-        if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-        this.headersSent = true;
-        _statusCode = this.statusCode;
-
-        const bodyOut = Buffer.concat(chunks);
-        const responseHeaders: Record<string, string> = {};
-        for (const [k, v] of Object.entries(_headers)) {
-          if (k !== "transfer-encoding" && k !== "content-length") {
-            responseHeaders[k] = v;
-          }
+        if (chunk) {
+          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          chunks.push(buf);
         }
-        responseHeaders["content-length"] = String(bodyOut.length);
-        if (!responseHeaders["content-type"]) {
-          responseHeaders["content-type"] = "application/octet-stream";
-        }
-
-        resolve(new NextResponse(bodyOut, {
-          status: _statusCode,
-          headers: responseHeaders,
-        }));
+        _statusCode = this.statusCode || _statusCode;
+        finalize();
       },
 
-      // Express uses these
       status(code: number) { this.statusCode = code; return this; },
       send(data: any) {
-        if (typeof data === "string") this.write(data);
-        else if (Buffer.isBuffer(data)) this.write(data);
-        else this.write(String(data));
+        if (data !== undefined && data !== null) {
+          if (typeof data === "string") this.write(data);
+          else if (Buffer.isBuffer(data)) this.write(data);
+          else this.write(String(data));
+        }
         this.end();
       },
       json(data: any) {
-        this.setHeader("content-type", "application/json");
+        _headers["content-type"] = _headers["content-type"] || "application/json";
         this.write(JSON.stringify(data));
         this.end();
       },
       redirect(...args: any[]) {
         const target = typeof args[1] === "string" ? args[1] : args[0];
-        this.setHeader("location", target);
+        _headers["location"] = target;
         this.statusCode = typeof args[0] === "number" ? args[0] : 302;
         this.end();
       },
@@ -145,8 +147,7 @@ async function handleRequest(
         const newVal = Array.isArray(value) ? value.join(", ") : String(value);
         _headers[name.toLowerCase()] = existing ? existing + ", " + newVal : newVal;
       },
-      type(type: string) { this.setHeader("content-type", type); },
-      format(obj: any) { const type = this.get?.("content-type") || "application/octet-stream"; if (obj[type]) obj[type](); else if (obj.default) obj.default(); return this; },
+      type(type: string) { _headers["content-type"] = type; },
       get(name: string) { return this.getHeader(name); },
       cookie() { return this; },
       locals: {},
@@ -154,37 +155,38 @@ async function handleRequest(
 
     try {
       const handler = getHandler()!;
+      console.log(`[API Bridge] Calling handler for ${apiPath}`);
       const result = handler(nodeReq, nodeRes);
-      // If handler returns a Promise, catch errors
       if (result && typeof result.catch === "function") {
         result.catch((err: any) => {
           console.error("[API Bridge] Async error:", err.message);
-          chunks.length = 0;
-          _headers["content-type"] = "application/json";
-          chunks.push(Buffer.from(JSON.stringify({ error: "Internal Server Error", detail: err.message })));
-          nodeRes.statusCode = 500;
-          nodeRes.end();
+          if (!resolved) {
+            chunks.length = 0;
+            _headers["content-type"] = "application/json";
+            chunks.push(Buffer.from(JSON.stringify({ error: "Internal Server Error", detail: err.message })));
+            _statusCode = 500;
+            finalize();
+          }
         });
       }
     } catch (err: any) {
-      console.error("[API Bridge] Sync error:", err.message, err.stack);
-      chunks.length = 0;
-      _headers["content-type"] = "application/json";
-      chunks.push(Buffer.from(JSON.stringify({ error: "Internal Server Error", detail: err.message })));
-      nodeRes.statusCode = 500;
-      nodeRes.end();
+      console.error("[API Bridge] Sync error:", err.message);
+      if (!resolved) {
+        chunks.length = 0;
+        _headers["content-type"] = "application/json";
+        chunks.push(Buffer.from(JSON.stringify({ error: "Internal Server Error", detail: err.message })));
+        _statusCode = 500;
+        finalize();
+      }
     }
 
-    // Timeout fallback — if Express never calls end(), resolve after 25s
     setTimeout(() => {
-      if (chunks.length === 0) {
-        chunks.push(Buffer.from(JSON.stringify({ error: "Gateway Timeout" })));
+      if (!resolved) {
+        console.log(`[API Bridge] Timeout for ${apiPath}`);
         _headers["content-type"] = "application/json";
+        chunks.push(Buffer.from(JSON.stringify({ error: "Gateway Timeout" })));
+        finalize();
       }
-      resolve(new NextResponse(Buffer.concat(chunks), {
-        status: _statusCode || 504,
-        headers: { ..._headers, "content-length": String(Buffer.concat(chunks).length) },
-      }));
     }, 25000);
   });
 }
