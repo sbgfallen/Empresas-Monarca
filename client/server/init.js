@@ -12,6 +12,11 @@ const { ensureCreditsTable } = require("./services/credits");
 const { ensureCategoriesTable } = require("./services/categories");
 const { ensureSubscriptionsTable } = require("./services/subscriptions");
 const { ensureProductsTable } = require("./services/products");
+const { ensureAuditLogTable } = require("./services/audit");
+const { ensureSessionsTable } = require("./services/sessions");
+const { ensureOrdersTable } = require("./services/orders");
+const { ensureReservationsTable } = require("./services/reservations");
+const { ensureSectionsTable } = require("./services/sections");
 
 async function initializeDatabase() {
   console.log("[Init] Initializing database tables...");
@@ -33,6 +38,11 @@ async function initializeDatabase() {
       ensureCreditsTable(),
       ensureCategoriesTable(),
       ensureSubscriptionsTable(),
+      ensureAuditLogTable(),
+      ensureSessionsTable(),
+      ensureOrdersTable(),
+      ensureReservationsTable(),
+      ensureSectionsTable(),
     ]);
 
     console.log(`[Init] All database tables ready (${Date.now() - start}ms)`);

@@ -21,6 +21,10 @@ const imagesRoutes = require("../server/routes/images");
 const cobrosRoutes = require("../server/routes/cobros");
 const categoriesRoutes = require("../server/routes/categories");
 const subscriptionsRoutes = require("../server/routes/subscriptions");
+const ordersRoutes = require("../server/routes/orders");
+const reservationsRoutes = require("../server/routes/reservations");
+const auditRoutes = require("../server/routes/audit");
+const sectionsRoutes = require("../server/routes/sections");
 
 // ─── Initialize Express app ────────────────────────────
 const app = express();
@@ -65,6 +69,10 @@ app.use("/api/images", imagesRoutes);
 app.use("/api/cobros", cobrosRoutes);
 app.use("/api/categories", categoriesRoutes);
 app.use("/api/subscriptions", subscriptionsRoutes);
+app.use("/api/orders", ordersRoutes);
+app.use("/api/reservations", reservationsRoutes);
+app.use("/api/audit", auditRoutes);
+app.use("/api/sections", sectionsRoutes);
 
 // Health check
 app.get("/", (_req, res) => {
