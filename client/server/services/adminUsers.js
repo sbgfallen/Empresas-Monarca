@@ -48,26 +48,18 @@ async function ensureAdminUsers() {
         )
       `);
 
-      const admins = await db.query("SELECT COUNT(*)::int AS total FROM admin_users");
+      const bootstrap = getBootstrapAdmin();
+      const passwordHash = await bcrypt.hash(bootstrap.password, 12);
 
-      if (admins.rows[0].total === 0) {
-        const bootstrap = getBootstrapAdmin();
-        const passwordHash = await bcrypt.hash(bootstrap.password, 12);
+      await db.query(
+        `INSERT INTO admin_users (name, email, password_hash, role)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (email) DO UPDATE SET
+           password_hash = $3, role = $4, updated_at = NOW()`,
+        [bootstrap.name, bootstrap.email, passwordHash, bootstrap.role]
+      );
 
-        await db.query(
-          `
-          INSERT INTO admin_users (name, email, password_hash, role)
-          VALUES ($1, $2, $3, $4)
-          `,
-          [bootstrap.name, bootstrap.email, passwordHash, bootstrap.role]
-        );
-
-        if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
-          console.warn(
-            "Created development admin: admin@empresasmonarca.com / MonarcaAdmin2026!. Set ADMIN_EMAIL and ADMIN_PASSWORD before production."
-          );
-        }
-      }
+      console.log("[Admin] Default admin ensured:", bootstrap.email);
     })();
   }
 
