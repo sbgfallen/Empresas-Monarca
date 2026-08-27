@@ -25,6 +25,7 @@ const ordersRoutes = require("../server/routes/orders");
 const reservationsRoutes = require("../server/routes/reservations");
 const auditRoutes = require("../server/routes/audit");
 const sectionsRoutes = require("../server/routes/sections");
+const debugRoutes = require("../server/routes/debug");
 
 // ─── Initialize Express app ────────────────────────────
 const app = express();
@@ -73,6 +74,7 @@ app.use("/api/orders", ordersRoutes);
 app.use("/api/reservations", reservationsRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/sections", sectionsRoutes);
+app.use("/api/debug", debugRoutes);
 
 // Health check
 app.get("/", (_req, res) => {
