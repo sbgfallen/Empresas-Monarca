@@ -1,5 +1,7 @@
 /**
- * Vercel Serverless Adapter for Express
+ * Vercel Serverless Handler for Express
+ * This file is used by the Next.js App Router route handler
+ * to bridge requests to the Express app.
  */
 const express = require("express");
 const cors = require("cors");
@@ -7,25 +9,25 @@ const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 
 // ─── Import routes ─────────────────────────────────────
-const authRoutes = require("../server/routes/auth");
-const adminUserRoutes = require("../server/routes/adminUsers");
-const productRoutes = require("../server/routes/products");
-const creditRoutes = require("../server/routes/credits");
-const analyticsRoutes = require("../server/routes/analytics");
-const settingsRoutes = require("../server/routes/settings");
-const promotionsRoutes = require("../server/routes/promotions");
-const newsRoutes = require("../server/routes/news");
-const bannersRoutes = require("../server/routes/banners");
-const announcementsRoutes = require("../server/routes/announcements");
-const imagesRoutes = require("../server/routes/images");
-const cobrosRoutes = require("../server/routes/cobros");
-const categoriesRoutes = require("../server/routes/categories");
-const subscriptionsRoutes = require("../server/routes/subscriptions");
-const ordersRoutes = require("../server/routes/orders");
-const reservationsRoutes = require("../server/routes/reservations");
-const auditRoutes = require("../server/routes/audit");
-const sectionsRoutes = require("../server/routes/sections");
-const debugRoutes = require("../server/routes/debug");
+const authRoutes = require("./routes/auth");
+const adminUserRoutes = require("./routes/adminUsers");
+const productRoutes = require("./routes/products");
+const creditRoutes = require("./routes/credits");
+const analyticsRoutes = require("./routes/analytics");
+const settingsRoutes = require("./routes/settings");
+const promotionsRoutes = require("./routes/promotions");
+const newsRoutes = require("./routes/news");
+const bannersRoutes = require("./routes/banners");
+const announcementsRoutes = require("./routes/announcements");
+const imagesRoutes = require("./routes/images");
+const cobrosRoutes = require("./routes/cobros");
+const categoriesRoutes = require("./routes/categories");
+const subscriptionsRoutes = require("./routes/subscriptions");
+const ordersRoutes = require("./routes/orders");
+const reservationsRoutes = require("./routes/reservations");
+const auditRoutes = require("./routes/audit");
+const sectionsRoutes = require("./routes/sections");
+const debugRoutes = require("./routes/debug");
 
 // ─── Initialize Express app ────────────────────────────
 const app = express();
@@ -87,7 +89,7 @@ let dbInitialized = false;
 async function ensureDb() {
   if (dbInitialized) return;
   try {
-    const { initializeDatabase } = require("../server/init");
+    const { initializeDatabase } = require("./init");
     await initializeDatabase();
     dbInitialized = true;
     console.log("[Vercel] Database initialized successfully");
