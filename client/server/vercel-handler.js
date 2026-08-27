@@ -3,10 +3,18 @@
  * This file is used by the Next.js App Router route handler
  * to bridge requests to the Express app.
  */
+const path = require("path");
+const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 // ─── Import routes ─────────────────────────────────────
 const authRoutes = require("./routes/auth");
