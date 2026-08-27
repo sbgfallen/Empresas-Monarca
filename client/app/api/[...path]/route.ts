@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Readable } from "node:stream";
 
-let expressHandler: ((req: any, res: any) => Promise<void>) | null = null;
+let expressHandler: ((req: any, res: any) => any) | null = null;
 
 function getHandler() {
   if (expressHandler) return expressHandler;
@@ -39,7 +39,7 @@ async function handleRequest(
     }
   });
 
-  // Build full headers object (Express expects lowercase)
+  // Build headers
   const headers: Record<string, string> = {};
   request.headers.forEach((value, key) => {
     headers[key] = value;
@@ -48,9 +48,7 @@ async function handleRequest(
   // Build Node.js IncomingMessage-like object
   const readable = new Readable({
     read() {
-      if (body) {
-        this.push(body);
-      }
+      if (body) this.push(body);
       this.push(null);
     },
   });
@@ -68,91 +66,126 @@ async function handleRequest(
     get connection() { return this.socket; },
   });
 
-  // Collect response
-  const chunks: Buffer[] = [];
-  let statusCode = 200;
-  let resHeaders: Record<string, string> = {};
+  // Build response collector — wraps in Promise that resolves on end()
+  return new Promise<NextResponse>((resolve) => {
+    const chunks: Buffer[] = [];
+    let _statusCode = 200;
+    const _headers: Record<string, string> = {};
 
-  const nodeRes: any = {
-    statusCode: 200,
-    headersSent: false,
-    _headers: {} as Record<string, string>,
-    setHeader(name: string, value: string | string[]) {
-      this._headers[name.toLowerCase()] = Array.isArray(value)
-        ? value.join(", ")
-        : String(value);
-    },
-    getHeader(name: string) {
-      return this._headers[name.toLowerCase()];
-    },
-    removeHeader(name: string) {
-      delete this._headers[name.toLowerCase()];
-    },
-    writeHead(code: number, hdrs?: Record<string, string>) {
-      this.statusCode = code;
-      if (hdrs) Object.assign(this._headers, hdrs);
-      return this;
-    },
-    write(chunk: string | Buffer) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-      return true;
-    },
-    end(chunk?: string | Buffer) {
-      if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-      this.headersSent = true;
-      statusCode = this.statusCode;
-      resHeaders = { ...this._headers };
-    },
-    status(code: number) {
-      this.statusCode = code;
-      return this;
-    },
-    json(data: any) {
-      const json = JSON.stringify(data);
-      this.setHeader("content-type", "application/json");
-      this.write(json);
-      this.end();
-    },
-    cookie() { return this; },
-    redirect() { this.end(); },
-    sendStatus(code: number) {
-      this.statusCode = code;
-      this.end();
-    },
-    send(data: string | Buffer) {
-      if (typeof data === "string") {
-        this.write(data);
-      } else {
-        this.write(data);
+    const nodeRes: any = {
+      statusCode: 200,
+      headersSent: false,
+
+      setHeader(name: string, value: string | string[]) {
+        _headers[name.toLowerCase()] = Array.isArray(value)
+          ? value.join(", ")
+          : String(value);
+      },
+      getHeader(name: string) {
+        return _headers[name.toLowerCase()];
+      },
+      removeHeader(name: string) {
+        delete _headers[name.toLowerCase()];
+      },
+      writeHead(code: number, hdrs?: Record<string, string>) {
+        _statusCode = code;
+        if (hdrs) Object.assign(_headers, hdrs);
+        return this;
+      },
+      write(chunk: string | Buffer) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        return true;
+      },
+      end(chunk?: string | Buffer) {
+        if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        this.headersSent = true;
+        _statusCode = this.statusCode;
+
+        const bodyOut = Buffer.concat(chunks);
+        const responseHeaders: Record<string, string> = {};
+        for (const [k, v] of Object.entries(_headers)) {
+          if (k !== "transfer-encoding" && k !== "content-length") {
+            responseHeaders[k] = v;
+          }
+        }
+        responseHeaders["content-length"] = String(bodyOut.length);
+        if (!responseHeaders["content-type"]) {
+          responseHeaders["content-type"] = "application/octet-stream";
+        }
+
+        resolve(new NextResponse(bodyOut, {
+          status: _statusCode,
+          headers: responseHeaders,
+        }));
+      },
+
+      // Express uses these
+      status(code: number) { this.statusCode = code; return this; },
+      send(data: any) {
+        if (typeof data === "string") this.write(data);
+        else if (Buffer.isBuffer(data)) this.write(data);
+        else this.write(String(data));
+        this.end();
+      },
+      json(data: any) {
+        this.setHeader("content-type", "application/json");
+        this.write(JSON.stringify(data));
+        this.end();
+      },
+      redirect(...args: any[]) {
+        const target = typeof args[1] === "string" ? args[1] : args[0];
+        this.setHeader("location", target);
+        this.statusCode = typeof args[0] === "number" ? args[0] : 302;
+        this.end();
+      },
+      sendStatus(code: number) { this.statusCode = code; this.end(); },
+      set(name: string, value: string | string[]) { this.setHeader(name, value); },
+      append(name: string, value: string | string[]) {
+        const existing = _headers[name.toLowerCase()];
+        const newVal = Array.isArray(value) ? value.join(", ") : String(value);
+        _headers[name.toLowerCase()] = existing ? existing + ", " + newVal : newVal;
+      },
+      type(type: string) { this.setHeader("content-type", type); },
+      format(obj: any) { const type = this.get?.("content-type") || "application/octet-stream"; if (obj[type]) obj[type](); else if (obj.default) obj.default(); return this; },
+      get(name: string) { return this.getHeader(name); },
+      cookie() { return this; },
+      locals: {},
+    };
+
+    try {
+      const handler = getHandler()!;
+      const result = handler(nodeReq, nodeRes);
+      // If handler returns a Promise, catch errors
+      if (result && typeof result.catch === "function") {
+        result.catch((err: any) => {
+          console.error("[API Bridge] Async error:", err.message);
+          chunks.length = 0;
+          _headers["content-type"] = "application/json";
+          chunks.push(Buffer.from(JSON.stringify({ error: "Internal Server Error", detail: err.message })));
+          nodeRes.statusCode = 500;
+          nodeRes.end();
+        });
       }
-      this.end();
-    },
-    locals: {},
-  };
-
-  try {
-    const handler = getHandler();
-    await handler!(nodeReq, nodeRes);
-  } catch (err: any) {
-    console.error("[API Bridge] Error:", err.message, err.stack);
-    statusCode = 500;
-    resHeaders = { "content-type": "application/json" };
-    chunks.length = 0;
-    chunks.push(Buffer.from(JSON.stringify({ error: "Internal Server Error", detail: err.message })));
-  }
-
-  const bodyOut = Buffer.concat(chunks);
-  const responseHeaders: Record<string, string> = {};
-  for (const [k, v] of Object.entries(resHeaders)) {
-    if (k !== "transfer-encoding" && k !== "content-length") {
-      responseHeaders[k] = v;
+    } catch (err: any) {
+      console.error("[API Bridge] Sync error:", err.message, err.stack);
+      chunks.length = 0;
+      _headers["content-type"] = "application/json";
+      chunks.push(Buffer.from(JSON.stringify({ error: "Internal Server Error", detail: err.message })));
+      nodeRes.statusCode = 500;
+      nodeRes.end();
     }
-  }
-  responseHeaders["content-length"] = String(bodyOut.length);
 
-  return new NextResponse(bodyOut, {
-    status: statusCode,
-    headers: responseHeaders,
+    // Timeout fallback — if Express never calls end(), resolve after 25s
+    setTimeout(() => {
+      if (chunks.length === 0) {
+        chunks.push(Buffer.from(JSON.stringify({ error: "Gateway Timeout" })));
+        _headers["content-type"] = "application/json";
+      }
+      resolve(new NextResponse(Buffer.concat(chunks), {
+        status: _statusCode || 504,
+        headers: { ..._headers, "content-length": String(Buffer.concat(chunks).length) },
+      }));
+    }, 25000);
   });
 }
 
