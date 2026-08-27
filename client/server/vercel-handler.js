@@ -10,8 +10,10 @@ const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, "uploads");
+// Ensure uploads directory exists (Vercel: use /tmp for writable storage)
+const uploadsDir = process.env.VERCEL
+  ? "/tmp/uploads"
+  : path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }

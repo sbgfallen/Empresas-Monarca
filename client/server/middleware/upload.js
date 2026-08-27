@@ -5,7 +5,11 @@ const { isCloudinaryConfigured } = require("../services/cloudinary");
 
 let upload;
 
-if (isCloudinaryConfigured()) {
+// On Vercel serverless, skip disk storage and use memory storage
+if (process.env.VERCEL) {
+  upload = multer({ storage: multer.memoryStorage() });
+  console.log("[Upload] Using memory storage (Vercel serverless)");
+} else if (isCloudinaryConfigured()) {
   // Cloudinary Storage (Production)
   const { CloudinaryStorage } = require("multer-storage-cloudinary");
   const cloudinary = require("cloudinary").v2;
